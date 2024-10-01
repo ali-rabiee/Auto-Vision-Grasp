@@ -29,7 +29,7 @@ class jacoDiverseObjectEnv(gym.Env):
                 isDiscrete=False,
                 maxSteps=8,
                 dv=0.06,
-                removeAutoXDistance=True, #changed
+                removeAutoXDistance=True, 
                 objectRandom=0.3,
                 cameraRandom=0,
                 width=48,
@@ -92,7 +92,7 @@ class jacoDiverseObjectEnv(gym.Env):
         else:
             self.cid = pb.connect(pb.DIRECT)
 
-        self.seed()
+        # self.seed()
 
         #define number of actions
         if (self._isDiscrete):

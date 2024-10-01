@@ -102,57 +102,51 @@ def get_screen(environment):
 seeds_total = 6
 
 """ Evaluation of trained DQN model on different seeds"""
-for seed in range(seeds_total):
 
-    # Set seed
-    torch.manual_seed(seed)
-    random.seed(seed)
-    np.random.seed(seed)
+PATH = modelPath
 
-    PATH = modelPath
+# Number of trials per seed
+episode = 500   #[100,500,1000]
 
-    # Number of trials per seed
-    episode = 500   #[100,500,1000]
-    
-    scores_window = collections.deque(maxlen=100)  # Last 100 scores
-    # isTest=True -> perform grasping on test set of objects. Currently just mug.
-    # Select renders=True for GUI rendering
-    env = jacoDiverseObjectEnv(actionRepeat=80, renders=False, isDiscrete=True, maxSteps=30, dv=0.02,
-                            removeAutoXDistance=False, width=64, height=64, isTest=True)
+scores_window = collections.deque(maxlen=100)  # Last 100 scores
+# isTest=True -> perform grasping on test set of objects. Currently just mug.
+# Select renders=True for GUI rendering
+env = jacoDiverseObjectEnv(actionRepeat=80, renders=True, isDiscrete=True, maxSteps=30, dv=0.02,
+                        removeAutoXDistance=False, width=64, height=64, isTest=True)
+env.reset()
+
+init_screen = get_screen(environment=env)
+_, _, screen_height, screen_width = init_screen.shape
+n_actions = env.action_space.n  # Get number of actions from gym action space
+policy_net = DQN(screen_height, screen_width, n_actions).to(device)
+
+# Load trained model for the policy network
+checkpoint = torch.load(PATH, map_location=device)
+policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
+
+# Success and failures
+s=0
+f=0
+# Evaluate the trained model by selecting actions according to the policy net
+for i_episode in range(episode):
     env.reset()
-
-    init_screen = get_screen(environment=env)
-    _, _, screen_height, screen_width = init_screen.shape
-    n_actions = env.action_space.n  # Get number of actions from gym action space
-    policy_net = DQN(screen_height, screen_width, n_actions).to(device)
-
-    # Load trained model for the policy network
-    checkpoint = torch.load(PATH, map_location=device)
-    policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
-
-    # Success and failures
-    s=0
-    f=0
-    # Evaluate the trained model by selecting actions according to the policy net
-    for i_episode in range(episode):
-        env.reset()
-        state = get_screen(environment=env)
-        stacked_states = collections.deque(STACK_SIZE*[state], maxlen=STACK_SIZE)
-        for t in count():
-            stacked_states_t = torch.cat(tuple(stacked_states), dim=1)
-            # Select and perform an action
-            action = policy_net(stacked_states_t).max(1)[1].view(1, 1)
-            _, reward, done, _ = env.step(action.item())
-            # Observe new state
-            next_state = get_screen(environment=env)
-            stacked_states.append(next_state)
-            if done:
-                break
-        if reward==1:
-            s=s+1
-        if reward==0:
-            f=f+1
-        # Uncomment for immediate feedback after each episode   
-        #print("Successed: " + str(s) + "\tFailures: " + str(f) + "\t\tSuccessRate: " + str(s/(i_episode + 1)))
-    # Feedback after each
-    print("For Seed " + str(seed+1) +": \t Successed: " + str(s) + "\tFailures: " + str(f) + "\t\tSuccessRate: " + str(s/(i_episode + 1)))
+    state = get_screen(environment=env)
+    stacked_states = collections.deque(STACK_SIZE*[state], maxlen=STACK_SIZE)
+    for t in count():
+        stacked_states_t = torch.cat(tuple(stacked_states), dim=1)
+        # Select and perform an action
+        action = policy_net(stacked_states_t).max(1)[1].view(1, 1)
+        _, reward, done, _ = env.step(action.item())
+        # Observe new state
+        next_state = get_screen(environment=env)
+        stacked_states.append(next_state)
+        if done:
+            break
+    if reward==1:
+        s=s+1
+    if reward==0:
+        f=f+1
+    # Uncomment for immediate feedback after each episode   
+    #print("Successed: " + str(s) + "\tFailures: " + str(f) + "\t\tSuccessRate: " + str(s/(i_episode + 1)))
+# Feedback after each
+print(": \t Successed: " + str(s) + "\tFailures: " + str(f) + "\t\tSuccessRate: " + str(s/(i_episode + 1)))
